@@ -1,0 +1,345 @@
+<!doctype html>
+<!--
+  Asset lab: temple-management.webp
+  Original illustration (NOT a photo and NOT a screenshot of the production system).
+  A seven-tier pagoda lit at night, reflected in still water under a blue-violet dusk sky,
+  with a translucent mock "Pagoda Tower" light-booking panel. All panel values are mock.
+  Render at 1600x1000 (dpr 1), wait for body[data-ready="1"], then screenshot.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Asset lab: Temple Management</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #03050d; overflow: hidden; font-family: Inter, "Segoe UI", sans-serif; }
+  canvas { display: block; }
+  .vignette { position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(125% 100% at 58% 45%, transparent 55%, rgba(3,5,13,0.45) 85%, rgba(3,5,13,0.8) 100%); }
+  /* translucent mock management panel (glass over the scene) */
+  .panel { position: fixed; left: 80px; top: 455px; width: 380px; padding: 20px 22px 22px;
+    border-radius: 18px; color: #e9edff;
+    background: linear-gradient(160deg, rgba(40,52,120,0.42), rgba(10,14,40,0.55));
+    border: 1px solid rgba(150,170,255,0.22);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
+    backdrop-filter: blur(14px) saturate(1.2); }
+  .panel .k { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #9fb0ff; }
+  .panel h3 { margin: 6px 0 2px; font-size: 22px; font-weight: 600; }
+  .panel .sub { font-size: 13px; color: #8f9bc6; }
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; margin: 16px 0 16px; }
+  .grid i { display: block; aspect-ratio: 1; border-radius: 4px; border: 1px solid rgba(160,175,255,0.28); }
+  .grid i.b { background: radial-gradient(circle at 50% 40%, #ffe3a3, #f2a93b 70%); border-color: transparent; box-shadow: 0 0 8px rgba(255,190,90,0.55); }
+  .grid i.r { background: rgba(140,110,255,0.55); border-color: transparent; }
+  .row { display: flex; gap: 10px; }
+  .stat { flex: 1; padding: 10px 12px; border-radius: 12px; background: rgba(8,12,34,0.55); border: 1px solid rgba(150,170,255,0.12); }
+  .stat b { display: block; font-size: 20px; font-weight: 700; }
+  .stat span { font-size: 12px; color: #8f9bc6; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: #9aa6d3; margin-top: 12px; }
+  .legend em { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div class="vignette"></div>
+<div class="panel" id="panel">
+  <div class="k">Pagoda Tower · Level 3</div>
+  <h3>Light booking</h3>
+  <div class="sub">Mock data · illustrative</div>
+  <div class="grid" id="grid"></div>
+  <div class="row">
+    <div class="stat"><b>128</b><span>Booked</span></div>
+    <div class="stat"><b>72</b><span>Available</span></div>
+    <div class="stat"><b>14</b><span>Renewals due</span></div>
+  </div>
+  <div class="legend"><span><em style="background:#f2a93b"></em>Booked</span><span><em style="background:rgba(140,110,255,.7)"></em>Renewal</span><span><em style="border:1px solid rgba(160,175,255,.5)"></em>Available</span></div>
+</div>
+<script>
+  // deterministic grid of light slots
+  (function () {
+    const g = document.getElementById("grid"); let s = 3;
+    const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    for (let i = 0; i < 48; i++) { const r = rnd(); const el = document.createElement("i"); el.className = r < 0.58 ? "b" : r < 0.68 ? "r" : ""; g.appendChild(el); }
+  })();
+</script>
+<script type="module">
+import * as THREE from "three";
+import { Reflector } from "three/addons/objects/Reflector.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+const W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(34, W / H, 0.1, 400);
+camera.position.set(-1.5, 1.6, 30);
+camera.lookAt(-2.4, 5.0, 0);
+
+let seed = 42;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+/* ---------- sky: gradient, stars, moon (canvas on a far plane) ---------- */
+function skyTexture() {
+  const w = 2048, h = 1024;
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d");
+  const gr = g.createLinearGradient(0, 0, 0, h);
+  gr.addColorStop(0, "#03061a"); gr.addColorStop(0.45, "#0b1446"); gr.addColorStop(0.78, "#2a2a78"); gr.addColorStop(0.93, "#4a3a8e"); gr.addColorStop(1, "#6a4c90");
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  // soft violet glow near the horizon behind the pagoda
+  let r = g.createRadialGradient(w * 0.6, h, 10, w * 0.6, h, h * 0.8);
+  r.addColorStop(0, "rgba(150,110,220,0.45)"); r.addColorStop(1, "rgba(150,110,220,0)");
+  g.fillStyle = r; g.fillRect(0, 0, w, h);
+  // stars
+  for (let i = 0; i < 520; i++) {
+    const x = rnd() * w, y = Math.pow(rnd(), 1.6) * h * 0.8, s = rnd();
+    g.fillStyle = `rgba(220,230,255,${0.25 + s * 0.65})`;
+    g.beginPath(); g.arc(x, y, s > 0.97 ? 2.2 : s > 0.85 ? 1.4 : 0.8, 0, 7); g.fill();
+  }
+  // moon
+  const mx = w * 0.86, my = h * 0.16;
+  r = g.createRadialGradient(mx, my, 10, mx, my, 160);
+  r.addColorStop(0, "rgba(200,215,255,0.5)"); r.addColorStop(1, "rgba(200,215,255,0)");
+  g.fillStyle = r; g.fillRect(mx - 200, my - 200, 400, 400);
+  g.fillStyle = "#e9eeff"; g.beginPath(); g.arc(mx, my, 26, 0, 7); g.fill();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const sky = new THREE.Mesh(new THREE.PlaneGeometry(260, 130), new THREE.MeshBasicMaterial({ map: skyTexture(), toneMapped: false }));
+sky.position.set(0, 48, -120); scene.add(sky);
+
+/* ---------- distant hills + tree lines (canvas silhouettes with alpha) ---------- */
+function silhouetteTexture(draw, w = 2048, h = 512) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  draw(c.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+// Organic tree line: many overlapping foliage clumps of varied size on a layered-noise
+// height profile, plus a few conifer spikes — avoids the "row of bubbles" clip-art look.
+function treeLine(g, w, h, base, height, color, x0 = 0, x1 = w) {
+  g.fillStyle = color;
+  const prof = x => 0.55 + 0.25 * Math.sin(x * 0.0091 + 1.3) + 0.15 * Math.sin(x * 0.031) + 0.05 * Math.sin(x * 0.11);
+  g.beginPath(); g.moveTo(x0, h);
+  for (let x = x0; x <= x1; x += 4) g.lineTo(x, base - height * prof(x) * 0.8);
+  g.lineTo(x1, h); g.closePath(); g.fill();
+  for (let x = x0; x <= x1; x += 5) {
+    const top = base - height * prof(x);
+    for (let k = 0; k < 2; k++) {
+      const r = 4 + rnd() * 11;
+      g.beginPath(); g.arc(x + (rnd() - 0.5) * 8, top + rnd() * height * 0.35, r, 0, 7); g.fill();
+    }
+  }
+  for (let k = 0; k < (x1 - x0) / 260; k++) {
+    const x = x0 + rnd() * (x1 - x0), th = height * (0.75 + rnd() * 0.25), tw = 16 + rnd() * 10;
+    g.beginPath(); g.moveTo(x - tw, base - height * 0.4); g.lineTo(x, base - th); g.lineTo(x + tw, base - height * 0.4); g.fill();
+  }
+}
+const hills = new THREE.Mesh(new THREE.PlaneGeometry(180, 45), new THREE.MeshBasicMaterial({
+  transparent: true, toneMapped: false,
+  map: silhouetteTexture((g, w, h) => {
+    g.fillStyle = "#141a46";
+    g.beginPath(); g.moveTo(0, h);
+    for (let x = 0; x <= w; x += 8) g.lineTo(x, h * 0.62 - Math.sin(x * 0.003 + 1) * 60 - Math.sin(x * 0.011) * 22);
+    g.lineTo(w, h); g.fill();
+  }),
+}));
+hills.position.set(0, 10, -90); scene.add(hills);
+
+const trees = new THREE.Mesh(new THREE.PlaneGeometry(120, 30), new THREE.MeshBasicMaterial({
+  transparent: true, toneMapped: false,
+  map: silhouetteTexture((g, w, h) => {
+    treeLine(g, w, h, h * 0.955, 70, "#0d1236");                          // far, hazier layer
+    treeLine(g, w, h, h * 0.96, 150, "#060920", w * 0.64, w);             // taller grove right of the pagoda
+    treeLine(g, w, h, h * 0.96, 110, "#060920", 0, w * 0.2);
+    // small pavilion silhouette on the left shore with lit windows
+    const px = w * 0.27, py = h * 0.93;
+    g.fillStyle = "#070a22";
+    g.fillRect(px - 50, py - 60, 100, 60);
+    g.beginPath(); g.moveTo(px - 95, py - 56); g.quadraticCurveTo(px - 30, py - 70, px, py - 110); g.quadraticCurveTo(px + 30, py - 70, px + 95, py - 56); g.closePath(); g.fill();
+    g.fillStyle = "#ffbf6a"; [-28, 0, 28].forEach(dx => g.fillRect(px + dx - 7, py - 42, 14, 22));
+    // shoreline lanterns
+    for (let i = 0; i < 26; i++) {
+      const x = w * 0.08 + i * (w * 0.84) / 26 + rnd() * 20, y = h * 0.955 - rnd() * 6;
+      const gr = g.createRadialGradient(x, y, 0, x, y, 9);
+      gr.addColorStop(0, "rgba(255,200,120,0.95)"); gr.addColorStop(1, "rgba(255,170,80,0)");
+      g.fillStyle = gr; g.beginPath(); g.arc(x, y, 9, 0, 7); g.fill();
+    }
+  }),
+}));
+// canvas row 0.955h (the lantern line) lands at the waterline
+trees.position.set(0, 13.7, -40); scene.add(trees);
+
+/* ---------- pagoda ---------- */
+function windowTexture() {
+  const c = document.createElement("canvas"); c.width = 1024; c.height = 128;
+  const g = c.getContext("2d");
+  g.fillStyle = "#000"; g.fillRect(0, 0, 1024, 128);
+  for (let i = 0; i < 8; i++) {
+    const cx = i * 128 + 64;
+    const gr = g.createLinearGradient(0, 20, 0, 118);
+    gr.addColorStop(0, "#ffe2a8"); gr.addColorStop(1, "#ff9a3c");
+    g.fillStyle = gr;
+    g.beginPath(); g.moveTo(cx - 34, 118); g.lineTo(cx - 34, 52); g.quadraticCurveTo(cx, 8, cx + 34, 52); g.lineTo(cx + 34, 118); g.closePath(); g.fill();
+    g.fillStyle = "rgba(90,40,10,0.55)"; g.fillRect(cx - 2, 30, 4, 90); g.fillRect(cx - 34, 80, 68, 3);
+    // faint glow on the wall between windows
+    g.fillStyle = "rgba(255,150,60,0.05)"; g.fillRect(i * 128, 0, 128, 128);
+    g.fillStyle = "#000"; g.fillRect(i * 128, 0, 6, 128); g.fillRect(i * 128 + 122, 0, 6, 128); // pillars
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const winTex = windowTexture();
+const wallMat = new THREE.MeshStandardMaterial({ color: 0x4a1f18, roughness: 0.8, emissive: new THREE.Color(1.0, 0.62, 0.28), emissiveMap: winTex, emissiveIntensity: 1.35 });
+const roofMat = new THREE.MeshStandardMaterial({ color: 0x2a2c48, roughness: 0.5, metalness: 0.3, side: THREE.DoubleSide });
+const goldMat = new THREE.MeshStandardMaterial({ color: 0xd9a441, roughness: 0.3, metalness: 1, emissive: 0x6b3a08, emissiveIntensity: 0.6 });
+const bulbMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.5, 0.6), toneMapped: false });
+const stoneMat = new THREE.MeshStandardMaterial({ color: 0x4a4560, roughness: 0.85 });
+
+const pagoda = new THREE.Group();
+const bulbs = [];
+const TIERS = 7;
+let y = 1.25;
+for (let i = 0; i < TIERS; i++) {
+  const t = i / (TIERS - 1);
+  const r = THREE.MathUtils.lerp(2.35, 1.15, t);
+  const bodyH = THREE.MathUtils.lerp(1.15, 0.8, t);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.8, r * 0.82, bodyH, 8, 1, false, Math.PI / 8), wallMat);
+  body.position.y = y + bodyH / 2; pagoda.add(body);
+  // railing ring of lights just above each roof
+  const roofY = y + bodyH;
+  // flared octagonal roof: concave lathe profile with an upturned lip
+  const ro = r * 1.42, ri = r * 0.7;
+  const prof = [];
+  for (let k = 0; k <= 12; k++) {
+    const s = k / 12;
+    const rad = THREE.MathUtils.lerp(ri, ro, s);
+    const h = 0.55 * Math.pow(1 - s, 1.8) - (s > 0.85 ? -(s - 0.85) * 0.5 : 0);
+    prof.push(new THREE.Vector2(rad, roofY + h - 0.05));
+  }
+  const roof = new THREE.Mesh(new THREE.LatheGeometry(prof.reverse(), 8, Math.PI / 8 + Math.PI / 2), roofMat);
+  pagoda.add(roof);
+  // bulbs along the eave edges (8 edges x n)
+  for (let e = 0; e < 8; e++) {
+    const a0 = (e / 8) * Math.PI * 2 + Math.PI / 8 + Math.PI / 2, a1 = ((e + 1) / 8) * Math.PI * 2 + Math.PI / 8 + Math.PI / 2;
+    const p0 = new THREE.Vector3(Math.sin(a0) * ro, 0, Math.cos(a0) * ro), p1 = new THREE.Vector3(Math.sin(a1) * ro, 0, Math.cos(a1) * ro);
+    const n = 6;
+    for (let k = 0; k < n; k++) {
+      const p = p0.clone().lerp(p1, k / n); p.y = roofY + 0.02;
+      bulbs.push(p);
+    }
+    // upturned corner tip
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.38, 6), goldMat);
+    tip.position.set(p0.x * 1.03, roofY + 0.14, p0.z * 1.03);
+    tip.lookAt(p0.x * 2, roofY + 2.2, p0.z * 2); tip.rotateX(Math.PI / 2);
+    pagoda.add(tip);
+  }
+  // warm light under each roof so the eaves' undersides glow
+  const pl = new THREE.PointLight(0xffa654, 1.6, r * 2.6, 2); pl.position.set(0, roofY - 0.1, 0); pagoda.add(pl);
+  y = roofY + 0.18;
+}
+// spire
+const spire = new THREE.Group();
+const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.1, 2.4, 12), goldMat); mast.position.y = 1.2; spire.add(mast);
+for (let k = 0; k < 6; k++) {
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.32 - k * 0.04, 0.035, 8, 32), goldMat);
+  ring.rotation.x = Math.PI / 2; ring.position.y = 0.35 + k * 0.26; spire.add(ring);
+}
+const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.16, 24, 12), bulbMat); pearl.position.y = 2.5; spire.add(pearl);
+spire.position.y = y; pagoda.add(spire);
+
+// bulbs as one InstancedMesh (hundreds of tiny lights, one draw call)
+const bulbGeo = new THREE.SphereGeometry(0.055, 8, 6);
+const inst = new THREE.InstancedMesh(bulbGeo, bulbMat, bulbs.length);
+const m4 = new THREE.Matrix4();
+bulbs.forEach((p, i) => { m4.makeTranslation(p.x, p.y, p.z); inst.setMatrixAt(i, m4); });
+pagoda.add(inst);
+
+// stone base: two octagonal terraces with a lit balustrade
+const base1 = new THREE.Mesh(new THREE.CylinderGeometry(3.9, 4.1, 0.5, 8, 1, false, Math.PI / 8), stoneMat); base1.position.y = 0.25; pagoda.add(base1);
+const base2 = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.3, 0.55, 8, 1, false, Math.PI / 8), stoneMat); base2.position.y = 0.75; pagoda.add(base2);
+for (let k = 0; k < 40; k++) {
+  const a = (k / 40) * Math.PI * 2;
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), bulbMat);
+  lamp.position.set(Math.sin(a) * 3.85, 0.62, Math.cos(a) * 3.85); pagoda.add(lamp);
+}
+const baseLight = new THREE.PointLight(0xffa654, 8, 8, 2); baseLight.position.set(0, 1.4, 4.5); pagoda.add(baseLight);
+
+pagoda.position.set(1.6, 0, 0);
+scene.add(pagoda);
+
+// small island the pagoda stands on
+const island = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.8, 0.3, 32), new THREE.MeshStandardMaterial({ color: 0x0b0f22, roughness: 0.9 }));
+island.position.set(1.6, 0.0, 0); scene.add(island);
+
+/* ---------- lighting ---------- */
+scene.add(new THREE.HemisphereLight(0x4a55b8, 0x0a0a18, 0.7));
+const moonLight = new THREE.DirectionalLight(0x9fb2ff, 0.8); moonLight.position.set(20, 30, -10); scene.add(moonLight);
+
+/* ---------- water: Reflector with a custom ripple shader ----------
+   The stock Reflector overlay-blends a tint; here the reflection is sampled with a small
+   horizontal ripple and a vertical multi-tap smear, so lights become long streaks as on
+   real night water. */
+const WaterShader = {
+  uniforms: { color: { value: null }, tDiffuse: { value: null }, textureMatrix: { value: null } },
+  vertexShader: /* glsl */`
+    uniform mat4 textureMatrix;
+    varying vec4 vUv;
+    varying vec3 vWorld;
+    void main() {
+      vUv = textureMatrix * vec4(position, 1.0);
+      vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: /* glsl */`
+    uniform vec3 color;
+    uniform sampler2D tDiffuse;
+    varying vec4 vUv;
+    varying vec3 vWorld;
+    void main() {
+      vec2 p = vUv.xy / vUv.w;
+      float z = vWorld.z;
+      // ripple in screen space (smooth, horizontal wobble), stronger toward the viewer
+      float amp = 0.0005 + 0.0011 * smoothstep(-40.0, 25.0, z);
+      p.x += (sin(p.y * 80.0) * 0.8 + sin(p.y * 170.0 + 1.7) * 0.2) * amp;
+      vec3 acc = vec3(0.0); float wsum = 0.0;
+      for (int i = 0; i < 14; i++) {
+        float fi = float(i);
+        float w = 1.0 - fi / 14.0;
+        acc += texture2D(tDiffuse, p + vec2(0.0, (fi - 4.0) * 0.0045)).rgb * w;
+        wsum += w;
+      }
+      vec3 col = acc / wsum * color;
+      col += vec3(0.010, 0.014, 0.040); // deep blue water body
+      gl_FragColor = vec4(col, 1.0);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+};
+const water = new Reflector(new THREE.PlaneGeometry(400, 200), { textureWidth: W, textureHeight: H, color: 0x7c88b8, shader: WaterShader });
+water.rotation.x = -Math.PI / 2; water.position.y = 0.02;
+scene.add(water);
+
+/* ---------- post ---------- */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), 0.55, 0.45, 0.86));
+composer.addPass(new OutputPass());
+
+window.__lab = { THREE, scene, camera, pagoda, water, render: () => composer.render() };
+let frames = 0;
+(function tick() {
+  composer.render();
+  if (++frames < 4) requestAnimationFrame(tick); else document.body.dataset.ready = "1";
+})();
+</script>
+</body>
+</html>

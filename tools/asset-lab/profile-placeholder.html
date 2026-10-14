@@ -1,0 +1,158 @@
+<!doctype html>
+<!--
+  Asset lab: profile-placeholder.webp  (3:4)
+  ABSTRACT portrait placeholder for the About section — NOT a photo and NOT a likeness of anyone.
+  A flat, featureless head-and-shoulders silhouette in profile with a blue rim light, in front of
+  translucent blue/violet glass panels (echoing the reference composition).
+  Replace with a real portrait by setting `profile.portrait` in src/data/profile.ts.
+  Render at 900x1200 (dpr 1) and screenshot.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Asset lab: Portrait placeholder</title>
+<style>
+  html, body { margin: 0; width: 900px; height: 1200px; overflow: hidden; background: #03050d; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+<svg width="900" height="1200" viewBox="0 0 900 1200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="0.22" cy="0.3" r="0.95">
+      <stop offset="0" stop-color="#1b2a78" />
+      <stop offset="0.38" stop-color="#0b1240" />
+      <stop offset="0.75" stop-color="#050820" />
+      <stop offset="1" stop-color="#03050d" />
+    </radialGradient>
+    <radialGradient id="bloom" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4f7bff" stop-opacity="0.55" />
+      <stop offset="1" stop-color="#4f7bff" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="bloomV" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8a5cff" stop-opacity="0.35" />
+      <stop offset="1" stop-color="#8a5cff" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="glassA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6f8cff" stop-opacity="0.42" />
+      <stop offset="0.55" stop-color="#3a4fd8" stop-opacity="0.16" />
+      <stop offset="1" stop-color="#2a2f9a" stop-opacity="0.05" />
+    </linearGradient>
+    <linearGradient id="glassB" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#7d63ff" stop-opacity="0.38" />
+      <stop offset="1" stop-color="#3b2fb0" stop-opacity="0.06" />
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b9c8ff" stop-opacity="0.9" />
+      <stop offset="1" stop-color="#5a74ff" stop-opacity="0.15" />
+    </linearGradient>
+    <linearGradient id="figure" x1="0" y1="0" x2="1" y2="0.4">
+      <stop offset="0" stop-color="#0d1434" />
+      <stop offset="0.5" stop-color="#080d24" />
+      <stop offset="1" stop-color="#05081a" />
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#9db4ff" />
+      <stop offset="1" stop-color="#4c6dff" />
+    </linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#5d78ff" stroke-opacity="0.07" stroke-width="1" />
+    </pattern>
+    <filter id="blur30" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="30" /></filter>
+    <filter id="blur8" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="8" /></filter>
+    <filter id="blur3"><feGaussianBlur stdDeviation="2.5" /></filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4" result="n" />
+      <feColorMatrix type="matrix" values="0 0 0 0 0.6  0 0 0 0 0.7  0 0 0 0 1  0 0 0 0.05 0" />
+    </filter>
+
+    <!-- The figure: a deliberately featureless profile silhouette (head, neck, hooded shoulders). -->
+    <path id="sil" d="
+      M 372 318
+      C 418 278, 532 276, 578 338
+      C 600 368, 607 408, 603 440
+      C 612 462, 622 480, 626 494
+      C 628 504, 618 508, 607 510
+      C 611 528, 609 546, 599 560
+      C 591 588, 572 604, 546 610
+      C 534 636, 530 664, 534 690
+      C 600 708, 700 738, 770 800
+      C 820 846, 850 920, 868 1010
+      L 900 1200 L 40 1200
+      L 70 960
+      C 92 860, 150 790, 240 752
+      C 282 734, 330 720, 352 700
+      C 360 664, 360 630, 352 600
+      C 316 566, 296 498, 304 436
+      C 310 384, 336 344, 372 318 Z" />
+    <!-- hood folds resting on the shoulders -->
+    <path id="hood" d="M 250 760 C 300 700, 420 690, 500 712 C 560 728, 610 760, 640 800 C 560 790, 470 790, 400 806 C 340 820, 290 800, 250 760 Z" />
+    <clipPath id="silClip"><use href="#sil" /></clipPath>
+  </defs>
+
+  <!-- background -->
+  <rect width="900" height="1200" fill="url(#bg)" />
+  <rect width="900" height="1200" fill="url(#grid)" />
+  <ellipse cx="200" cy="360" rx="360" ry="420" fill="url(#bloom)" />
+  <ellipse cx="760" cy="300" rx="260" ry="300" fill="url(#bloomV)" />
+
+  <!-- translucent glass panels (behind the figure) -->
+  <g>
+    <g transform="translate(60 120) skewY(-14)">
+      <rect width="250" height="560" rx="6" fill="url(#glassA)" />
+      <rect width="250" height="560" rx="6" fill="none" stroke="url(#edge)" stroke-width="2" />
+      <rect x="0" y="0" width="250" height="2" fill="#dbe4ff" opacity="0.7" />
+    </g>
+    <g transform="translate(-20 640) skewY(-14)">
+      <rect width="210" height="520" rx="6" fill="url(#glassB)" />
+      <rect width="210" height="520" rx="6" fill="none" stroke="#8f84ff" stroke-opacity="0.55" stroke-width="2" />
+    </g>
+    <g transform="translate(180 40) skewY(-14)">
+      <rect width="120" height="300" rx="5" fill="url(#glassA)" opacity="0.7" />
+      <rect width="120" height="300" rx="5" fill="none" stroke="#9fb3ff" stroke-opacity="0.4" stroke-width="1.5" />
+    </g>
+    <g transform="translate(660 120) skewY(10)" opacity="0.55">
+      <rect width="180" height="380" rx="6" fill="url(#glassB)" />
+      <rect width="180" height="380" rx="6" fill="none" stroke="#a48cff" stroke-opacity="0.45" stroke-width="1.5" />
+    </g>
+    <!-- light streaks on the glass -->
+    <path d="M 70 300 L 300 238" stroke="#cdd8ff" stroke-opacity="0.25" stroke-width="10" filter="url(#blur8)" />
+    <path d="M 0 900 L 180 852" stroke="#b9a8ff" stroke-opacity="0.22" stroke-width="12" filter="url(#blur8)" />
+  </g>
+
+  <!-- soft blue glow behind the head (separates the figure from the background) -->
+  <ellipse cx="400" cy="470" rx="230" ry="260" fill="#3d63ff" opacity="0.32" filter="url(#blur30)" />
+
+  <!-- rim light: a lighter copy of the silhouette, mostly covered by the dark figure shifted right,
+       leaves a thin bright edge on the back/top contour (light from behind-left) -->
+  <use href="#sil" fill="#6f8fff" filter="url(#blur8)" opacity="0.65" />
+  <use href="#sil" fill="url(#rim)" />
+  <use href="#sil" fill="url(#figure)" transform="translate(7 5)" clip-path="url(#silClip)" />
+  <!-- faint violet rim on the front edge -->
+  <g clip-path="url(#silClip)">
+    <use href="#sil" fill="none" stroke="#9c7bff" stroke-opacity="0.35" stroke-width="3" filter="url(#blur3)" transform="translate(-3 0)" />
+    <use href="#hood" fill="#0b1232" opacity="0.7" />
+    <path d="M 250 760 C 300 700, 420 690, 500 712 C 560 728, 610 760, 640 800" fill="none" stroke="#5a78ff" stroke-opacity="0.22" stroke-width="3" filter="url(#blur3)" />
+    <!-- subtle form shading so the shape isn't a dead flat fill -->
+    <ellipse cx="300" cy="980" rx="260" ry="200" fill="#1a2a78" opacity="0.25" filter="url(#blur30)" />
+  </g>
+
+  <!-- floating particles -->
+  <g fill="#c9d6ff">
+    <circle cx="120" cy="180" r="1.6" opacity="0.7" /><circle cx="700" cy="560" r="1.4" opacity="0.5" />
+    <circle cx="810" cy="140" r="2" opacity="0.6" /><circle cx="240" cy="620" r="1.2" opacity="0.5" />
+    <circle cx="640" cy="980" r="1.6" opacity="0.4" /><circle cx="90" cy="520" r="1.3" opacity="0.6" />
+    <circle cx="760" cy="420" r="1.1" opacity="0.5" /><circle cx="560" cy="160" r="1.4" opacity="0.5" />
+  </g>
+
+  <!-- bottom fade + fine grain -->
+  <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0.7" stop-color="#03050d" stop-opacity="0" />
+    <stop offset="1" stop-color="#03050d" stop-opacity="0.7" />
+  </linearGradient>
+  <rect width="900" height="1200" fill="url(#fade)" />
+  <rect width="900" height="1200" filter="url(#grain)" />
+</svg>
+<script>document.body.dataset.ready = "1";</script>
+</body>
+</html>

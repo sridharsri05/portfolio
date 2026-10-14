@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local tooling
+/.remember
+
+# design references and the raw source photo (the site uses the processed cutout in public/images)
+/Neon Full-Stack Developer Portfolio.png
+/Neon20Developer.png
+/South Asian Man.png

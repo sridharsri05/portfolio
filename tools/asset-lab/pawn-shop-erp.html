@@ -1,0 +1,302 @@
+<!doctype html>
+<!--
+  Asset lab: pawn-shop-erp.webp
+  Original illustration (NOT a screenshot of the client system). A mock gold-pawn ERP
+  dashboard on a monitor, gold bars, a balance scale and a lit brass lamp on a glossy desk.
+  All UI text/values are mock data drawn on a canvas texture.
+  Render at 1600x1000 (dpr 1), wait for body[data-ready="1"], then screenshot.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Asset lab: Pawn Shop ERP</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #03050d; overflow: hidden; }
+  canvas { display: block; }
+  /* photographic vignette, composited over the WebGL canvas */
+  .vignette { position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(120% 95% at 45% 40%, transparent 55%, rgba(3,5,13,0.55) 85%, rgba(3,5,13,0.85) 100%); }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div class="vignette"></div>
+<script type="module">
+import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+const W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x050816, 15, 28);
+const pmrem = new THREE.PMREMGenerator(renderer);
+// Custom "product studio" environment: a dark dome with a few softboxes. Metals only look like
+// metal when they reflect strong contrast, so this gives gold bright warm streaks + a blue rim.
+function studioEnv() {
+  const env = new THREE.Scene();
+  env.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.MeshBasicMaterial({ color: 0x0a0f22, side: THREE.BackSide })));
+  const box = (w, h, color, k, x, y, z) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(k), side: THREE.DoubleSide }));
+    m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m);
+  };
+  box(30, 12, 0xfff0d8, 2.2, 0, 30, 14);    // overhead key softbox
+  box(44, 14, 0xffe2b0, 1.5, 4, 10, 36);    // large warm front softbox (lights the bars' front faces)
+  box(50, 12, 0xffcf80, 1.3, 0, 14, -40);   // warm back strip (lights the bars' top faces)
+  box(6, 26, 0xffd9a0, 2.6, 34, 6, 12);     // warm strip, right
+  box(6, 26, 0x3f63ff, 3.2, -34, 6, -8);    // blue strip, left-back
+  box(40, 4, 0x7a5cff, 1.8, 0, 2, -40);     // violet strip behind, low
+  return pmrem.fromScene(env, 0.02).texture;
+}
+scene.environment = studioEnv();
+scene.environmentIntensity = 1.0;
+
+const camera = new THREE.PerspectiveCamera(30, W / H, 0.1, 200);
+camera.position.set(0.5, 3.7, 14.6);
+camera.lookAt(0.35, 2.05, 0);
+
+/* ---------- background: navy gradient with a blue haze behind the monitor ---------- */
+function bgTexture() {
+  const c = document.createElement("canvas"); c.width = 1024; c.height = 640;
+  const g = c.getContext("2d");
+  g.fillStyle = "#03050d"; g.fillRect(0, 0, 1024, 640);
+  let r = g.createRadialGradient(380, 260, 10, 380, 260, 520);
+  r.addColorStop(0, "rgba(46,72,170,0.55)"); r.addColorStop(0.45, "rgba(24,34,96,0.35)"); r.addColorStop(1, "rgba(3,5,13,0)");
+  g.fillStyle = r; g.fillRect(0, 0, 1024, 640);
+  r = g.createRadialGradient(880, 160, 10, 880, 160, 360);
+  r.addColorStop(0, "rgba(96,70,200,0.30)"); r.addColorStop(1, "rgba(3,5,13,0)");
+  g.fillStyle = r; g.fillRect(0, 0, 1024, 640);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const bg = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), new THREE.MeshBasicMaterial({ map: bgTexture(), toneMapped: false, fog: false }));
+bg.position.set(0, 6, -14); scene.add(bg);
+
+/* ---------- mock ERP dashboard drawn on a canvas ---------- */
+function rr(g, x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
+function dashboardTexture() {
+  const c = document.createElement("canvas"); c.width = 1920; c.height = 1080;
+  const g = c.getContext("2d");
+  g.fillStyle = "#070b18"; g.fillRect(0, 0, 1920, 1080);
+  // sidebar
+  g.fillStyle = "#0a1022"; g.fillRect(0, 0, 300, 1080);
+  g.fillStyle = "#6d6cf6"; rr(g, 36, 40, 48, 48, 12); g.fill();
+  g.fillStyle = "#fff"; g.font = "600 30px Inter, Segoe UI, sans-serif"; g.fillText("PawnERP", 100, 75);
+  const menu = ["Dashboard", "Pledges", "Renewals", "Redemptions", "Auctions", "Branches", "Day-end", "Reports"];
+  menu.forEach((m, i) => {
+    const y = 150 + i * 72;
+    if (i === 0) { g.fillStyle = "rgba(109,108,246,0.22)"; rr(g, 20, y - 6, 260, 56, 12); g.fill(); }
+    g.fillStyle = i === 0 ? "#a8a6ff" : "#5d6889"; rr(g, 44, y + 10, 24, 24, 6); g.fill();
+    g.fillStyle = i === 0 ? "#e8ebff" : "#8792b3"; g.font = "500 26px Inter, Segoe UI, sans-serif"; g.fillText(m, 88, y + 32);
+  });
+  // top bar
+  g.fillStyle = "#e8ebff"; g.font = "600 40px Inter, Segoe UI, sans-serif"; g.fillText("Branch overview", 350, 90);
+  g.fillStyle = "#6b7698"; g.font = "400 24px Inter, Segoe UI, sans-serif"; g.fillText("Mock data · all branches", 350, 128);
+  g.fillStyle = "#121a33"; rr(g, 1380, 52, 360, 56, 28); g.fill();
+  g.fillStyle = "#6b7698"; g.font = "400 24px Inter, Segoe UI, sans-serif"; g.fillText("Search pledge…", 1420, 88);
+  g.fillStyle = "#6d6cf6"; g.beginPath(); g.arc(1820, 80, 28, 0, 7); g.fill();
+  // KPI cards
+  const kpis = [["Active pledges", "1,284", "#8b8afc"], ["Gold held (g)", "18,420", "#f5c451"], ["Renewals due", "96", "#5fb4ff"], ["Auctions", "12", "#c08bff"]];
+  kpis.forEach(([l, v, col], i) => {
+    const x = 350 + i * 385;
+    g.fillStyle = "#0e1530"; rr(g, x, 170, 355, 170, 18); g.fill();
+    g.strokeStyle = "rgba(120,130,220,0.18)"; g.lineWidth = 2; g.stroke();
+    g.fillStyle = "#7d88ab"; g.font = "500 24px Inter, Segoe UI, sans-serif"; g.fillText(l, x + 28, 222);
+    g.fillStyle = "#f2f4ff"; g.font = "700 54px Inter, Segoe UI, sans-serif"; g.fillText(v, x + 28, 292);
+    g.fillStyle = col; rr(g, x + 28, 312, 120, 8, 4); g.fill();
+    g.fillStyle = "rgba(255,255,255,0.08)"; rr(g, x + 150, 312, 170, 8, 4); g.fill();
+  });
+  // area chart
+  g.fillStyle = "#0e1530"; rr(g, 350, 370, 1000, 360, 18); g.fill();
+  g.fillStyle = "#c9cff0"; g.font = "600 28px Inter, Segoe UI, sans-serif"; g.fillText("Loan book (RM)", 380, 420);
+  g.strokeStyle = "rgba(255,255,255,0.06)"; g.lineWidth = 2;
+  for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(380, 470 + i * 52); g.lineTo(1320, 470 + i * 52); g.stroke(); }
+  const pts = [0.62, 0.55, 0.6, 0.48, 0.5, 0.38, 0.42, 0.3, 0.34, 0.24, 0.2, 0.14].map((v, i) => [390 + i * 84, 460 + v * 230]);
+  const grad = g.createLinearGradient(0, 460, 0, 700);
+  grad.addColorStop(0, "rgba(124,108,255,0.55)"); grad.addColorStop(1, "rgba(124,108,255,0)");
+  g.beginPath(); g.moveTo(pts[0][0], 700); pts.forEach(p => g.lineTo(p[0], p[1])); g.lineTo(pts.at(-1)[0], 700); g.closePath();
+  g.fillStyle = grad; g.fill();
+  g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]));
+  g.strokeStyle = "#9a8cff"; g.lineWidth = 5; g.stroke();
+  const p2 = [0.8, 0.74, 0.76, 0.7, 0.66, 0.68, 0.6, 0.62, 0.55, 0.52, 0.5, 0.46].map((v, i) => [390 + i * 84, 460 + v * 230]);
+  g.beginPath(); p2.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]));
+  g.strokeStyle = "#4fa6ff"; g.lineWidth = 4; g.setLineDash([10, 8]); g.stroke(); g.setLineDash([]);
+  // donut
+  g.fillStyle = "#0e1530"; rr(g, 1380, 370, 495, 360, 18); g.fill();
+  g.fillStyle = "#c9cff0"; g.font = "600 28px Inter, Segoe UI, sans-serif"; g.fillText("Pledge status", 1410, 420);
+  const seg = [[0.52, "#7c6cff"], [0.22, "#4fa6ff"], [0.16, "#f5c451"], [0.10, "#c08bff"]];
+  let a = -Math.PI / 2;
+  seg.forEach(([f, col]) => { g.beginPath(); g.arc(1530, 560, 100, a, a + f * Math.PI * 2 - 0.04); g.strokeStyle = col; g.lineWidth = 34; g.stroke(); a += f * Math.PI * 2; });
+  ["Active", "Renewed", "Redeemed", "Auction"].forEach((l, i) => {
+    g.fillStyle = seg[i][1]; rr(g, 1680, 490 + i * 46, 20, 20, 5); g.fill();
+    g.fillStyle = "#8f9abc"; g.font = "400 24px Inter, Segoe UI, sans-serif"; g.fillText(l, 1712, 508 + i * 46);
+  });
+  // table
+  g.fillStyle = "#0e1530"; rr(g, 350, 760, 1525, 290, 18); g.fill();
+  const cols = [380, 600, 900, 1120, 1360, 1620];
+  ["Pledge", "Customer", "Weight", "Amount", "Due", "Status"].forEach((h, i) => { g.fillStyle = "#6b7698"; g.font = "600 22px Inter, Segoe UI, sans-serif"; g.fillText(h, cols[i], 805); });
+  const rows = [["PL-20418", "A. Rahman", "24.5 g", "RM 6,120", "12 Nov", "Active", "#7c6cff"], ["PL-20417", "S. Kumar", "11.2 g", "RM 2,830", "09 Nov", "Renewed", "#4fa6ff"], ["PL-20412", "L. Wei Ming", "38.0 g", "RM 9,400", "02 Nov", "Redeemed", "#f5c451"], ["PL-20398", "N. Aziz", "8.7 g", "RM 2,050", "28 Oct", "Overdue", "#c08bff"]];
+  rows.forEach((r, j) => {
+    const y = 860 + j * 50;
+    g.strokeStyle = "rgba(255,255,255,0.05)"; g.beginPath(); g.moveTo(380, y - 32); g.lineTo(1845, y - 32); g.stroke();
+    r.slice(0, 5).forEach((t, i) => { g.fillStyle = i === 0 ? "#b9b6ff" : "#c9cff0"; g.font = "400 23px Inter, Segoe UI, sans-serif"; g.fillText(t, cols[i], y); });
+    g.fillStyle = r[6] + "33"; rr(g, cols[5] - 8, y - 26, 140, 36, 18); g.fill();
+    g.fillStyle = r[6]; g.font = "600 21px Inter, Segoe UI, sans-serif"; g.fillText(r[5], cols[5] + 12, y - 1);
+  });
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+
+/* ---------- desk: dark lacquered surface (clearcoat picks up the studio softboxes) ---------- */
+// A real-time mirror (Reflector) was tried: it over-reflected the gold into a pink smear, so
+// the desk uses a clearcoat sheen + shadows instead, which reads cleaner at card size.
+
+// Floor alpha fade: opaque around the props, transparent toward the back so the floor melts
+// into the background gradient instead of leaving a hard horizon line.
+function floorFade() {
+  const c = document.createElement("canvas"); c.width = 16; c.height = 512;
+  const g = c.getContext("2d");
+  const gr = g.createLinearGradient(0, 150, 0, 236);
+  gr.addColorStop(0, "#000"); gr.addColorStop(1, "#fff");
+  g.fillStyle = gr; g.fillRect(0, 0, 16, 512);
+  return new THREE.CanvasTexture(c);
+}
+const deskTop = new THREE.Mesh(new THREE.PlaneGeometry(80, 60), new THREE.MeshStandardMaterial({ color: 0x060a1a, roughness: 0.95, metalness: 0.0, envMapIntensity: 0.05, alphaMap: floorFade(), transparent: true, depthWrite: false }));
+deskTop.rotation.x = -Math.PI / 2; deskTop.receiveShadow = true; scene.add(deskTop);
+
+/* ---------- monitor ---------- */
+const monitor = new THREE.Group();
+const frameMat = new THREE.MeshPhysicalMaterial({ color: 0x0b0e18, roughness: 0.35, metalness: 0.6, clearcoat: 0.6 });
+const frame = new THREE.Mesh(new RoundedBoxGeometry(6.4, 3.75, 0.22, 6, 0.08), frameMat);
+frame.castShadow = true; monitor.add(frame);
+const screen = new THREE.Mesh(new THREE.PlaneGeometry(6.16, 3.465), new THREE.MeshBasicMaterial({ map: dashboardTexture(), toneMapped: false, color: 0xd8dcff }));
+screen.position.z = 0.112; monitor.add(screen);
+const neck = new THREE.Mesh(new RoundedBoxGeometry(0.42, 1.5, 0.18, 4, 0.06), frameMat);
+neck.position.set(0, -2.3, -0.25); monitor.add(neck);
+const base = new THREE.Mesh(new RoundedBoxGeometry(2.4, 0.08, 1.3, 4, 0.04), frameMat);
+base.position.set(0, -3.0, -0.1); base.castShadow = true; monitor.add(base);
+monitor.position.set(-1.25, 3.04, -0.6);
+monitor.rotation.y = 0.2;
+scene.add(monitor);
+// the screen casts cool light onto the desk
+const screenGlow = new THREE.PointLight(0x6f78ff, 3.5, 7, 1.8);
+screenGlow.position.set(-1.0, 2.6, 1.2); scene.add(screenGlow);
+
+/* ---------- gold ---------- */
+const goldMat = new THREE.MeshPhysicalMaterial({ color: 0xffb630, metalness: 1, roughness: 0.14, clearcoat: 0.5, clearcoatRoughness: 0.1, envMapIntensity: 1.25 });
+const goldSatin = new THREE.MeshPhysicalMaterial({ color: 0xd8962a, metalness: 1, roughness: 0.34, envMapIntensity: 1.1 });
+
+// trapezoid ingot: a trapezoid cross-section extruded along the bar's length with a small
+// bevel (the rounded edges are what catch highlights on metal), then tapered toward the top.
+function ingotGeometry(w, d, h, topW = 0.8, topD = 0.66) {
+  const bev = Math.min(d, h) * 0.09;
+  const bd = d / 2 - bev, td = (d * topD) / 2 - bev, hh = h - 2 * bev, len = w - 2 * bev;
+  const shape = new THREE.Shape();
+  shape.moveTo(-bd, 0); shape.lineTo(bd, 0); shape.lineTo(td, hh); shape.lineTo(-td, hh); shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: len, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 5, curveSegments: 1 });
+  geo.translate(0, bev, -len / 2);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const t = THREE.MathUtils.clamp(pos.getY(i) / h, 0, 1);
+    pos.setZ(i, pos.getZ(i) * THREE.MathUtils.lerp(1, topW, t));
+  }
+  geo.rotateY(Math.PI / 2);
+  return geo;
+}
+function ingot(w, d, h) {
+  const grp = new THREE.Group();
+  const m = new THREE.Mesh(ingotGeometry(w, d, h), goldMat); m.castShadow = true; m.receiveShadow = true; grp.add(m);
+  // recessed stamp panel on top
+  const stamp = new THREE.Mesh(ingotGeometry(w * 0.5, d * 0.34, 0.03, 0.94, 0.9), goldSatin);
+  stamp.position.y = h; grp.add(stamp);
+  return grp;
+}
+const gold = new THREE.Group();
+const b1 = ingot(2.1, 1.0, 0.55); b1.position.set(0, 0, 0); b1.rotation.y = -0.28; gold.add(b1);
+const b2 = ingot(2.1, 1.0, 0.55); b2.position.set(0.45, 0, 1.05); b2.rotation.y = -0.22; gold.add(b2);
+const b3 = ingot(2.1, 1.0, 0.55); b3.position.set(0.2, 0.555, 0.5); b3.rotation.y = -0.18; gold.add(b3);
+const b4 = ingot(1.3, 0.62, 0.36); b4.position.set(-1.05, 0, 1.95); b4.rotation.y = 0.35; gold.add(b4);
+gold.position.set(2.5, 0, 1.4); gold.scale.setScalar(0.82);
+scene.add(gold);
+
+/* balance scale (gold) behind the bars */
+const scale = new THREE.Group();
+const sBase = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, 0.18, 48), goldMat); sBase.position.y = 0.09; scale.add(sBase);
+const sPost = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 3.0, 24), goldMat); sPost.position.y = 1.6; scale.add(sPost);
+const sKnob = new THREE.Mesh(new THREE.SphereGeometry(0.14, 32, 16), goldMat); sKnob.position.y = 3.18; scale.add(sKnob);
+const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.6, 16), goldMat); beam.rotation.z = Math.PI / 2 + 0.05; beam.position.y = 2.95; scale.add(beam);
+[-1.28, 1.28].forEach((x, i) => {
+  const y = 2.95 + (i ? -0.065 : 0.065);
+  const pan = new THREE.Mesh(new THREE.SphereGeometry(0.46, 40, 16, 0, Math.PI * 2, Math.PI * 0.62, Math.PI * 0.38), goldMat);
+  pan.userData.pan = true; pan.position.set(x, y - 1.03, 0); pan.scale.y = 0.42; scale.add(pan); // shallow dish reads better than a deep bowl
+  for (let k = 0; k < 3; k++) {
+    const ang = (k / 3) * Math.PI * 2;
+    const a = new THREE.Vector3(x, y, 0), b = new THREE.Vector3(x + Math.cos(ang) * 0.4, y - 1.1, Math.sin(ang) * 0.4);
+    const len = a.distanceTo(b);
+    const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, len, 8), goldMat);
+    wire.position.copy(a).add(b).multiplyScalar(0.5);
+    wire.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+    scale.add(wire);
+  }
+});
+const scaleMat = new THREE.MeshPhysicalMaterial({ color: 0xffb630, metalness: 1, roughness: 0.3, envMapIntensity: 1.4 });
+// pans are open dishes: render both sides so the camera sees the lit inner surface
+const panMat = scaleMat.clone(); panMat.side = THREE.DoubleSide;
+scale.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = o.userData.pan ? panMat : scaleMat; } });
+scale.position.set(4.6, 0, -1.6); scale.rotation.y = -0.4; scale.scale.setScalar(0.78);
+scene.add(scale);
+
+/* brass oil lamp (left) with a warm flame — the glowing ornament in the reference */
+const lamp = new THREE.Group();
+const lampPts = [[0, 0], [0.55, 0], [0.58, 0.06], [0.3, 0.18], [0.16, 0.5], [0.14, 1.0], [0.3, 1.12], [0.62, 1.22], [0.66, 1.36], [0.5, 1.48], [0, 1.5]].map(([x, y]) => new THREE.Vector2(x, y));
+const lampBody = new THREE.Mesh(new THREE.LatheGeometry(lampPts, 64), goldMat); lampBody.castShadow = true; lamp.add(lampBody);
+const flame = new THREE.Mesh(new THREE.SphereGeometry(0.13, 32, 16), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 1.5, 0.55), toneMapped: false }));
+flame.scale.set(0.7, 1.6, 0.7); flame.position.set(0.0, 1.78, 0); lamp.add(flame);
+const flameLight = new THREE.PointLight(0xffa64a, 6, 5, 1.6); flameLight.position.set(0, 1.9, 0.2); lamp.add(flameLight);
+lamp.position.set(-4.9, 0, 0.2); lamp.scale.setScalar(0.66);
+scene.add(lamp);
+
+/* ---------- lighting ---------- */
+scene.add(new THREE.AmbientLight(0x1a2350, 0.6));
+// small warm bounce above the gold (kept high so it doesn't hot-spot the desk)
+const goldGlow = new THREE.PointLight(0xffb347, 4, 3.2, 2); goldGlow.position.set(2.6, 2.6, 2.2); scene.add(goldGlow);
+const key = new THREE.SpotLight(0xffd79a, 50, 30, 0.26, 0.8, 1.6);
+key.position.set(6, 9, 7); key.target.position.set(2.6, 0.6, 1.6); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004; key.shadow.radius = 6;
+scene.add(key, key.target);
+const rim = new THREE.SpotLight(0x4a7dff, 220, 30, 0.6, 0.7, 1.4);
+rim.position.set(-3, 6, -8); rim.target.position.set(1.5, 1, 0.5); scene.add(rim, rim.target);
+const rim2 = new THREE.PointLight(0x7a5cff, 25, 12, 1.5); rim2.position.set(5.5, 4, -3); scene.add(rim2);
+const fill = new THREE.PointLight(0x3b5bff, 10, 14, 1.4); fill.position.set(-6, 3, 4); scene.add(fill);
+
+/* ---------- post: bloom for the flame, gold glints and screen glow ---------- */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), 0.4, 0.5, 0.9));
+composer.addPass(new OutputPass());
+
+// exposed for quick look-dev tweaks from DevTools
+window.__lab = { THREE, scene, camera, deskTop, gold, render: () => composer.render() };
+
+let frames = 0;
+(function tick() {
+  composer.render();
+  if (++frames < 4) requestAnimationFrame(tick); else document.body.dataset.ready = "1";
+})();
+</script>
+</body>
+</html>

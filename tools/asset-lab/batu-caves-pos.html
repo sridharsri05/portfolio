@@ -1,0 +1,323 @@
+<!doctype html>
+<!--
+  Asset lab: batu-caves-pos.webp
+  Original illustration (NOT a screenshot of the live system). Three handheld devices:
+  left = phone with a QR e-ticket, middle = handheld POS/scanner with a QR in a blue scan
+  frame (and a 58mm receipt coming out of its printer), right = phone with a counter/POS
+  dashboard. QR codes are decorative random patterns, not real tickets. All values are mock.
+  Render at 1600x1000 (dpr 1), wait for body[data-ready="1"], then screenshot.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Asset lab: Ticketing &amp; POS</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #03050d; overflow: hidden; }
+  canvas { display: block; }
+  .vignette { position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(120% 95% at 50% 42%, transparent 55%, rgba(3,5,13,0.5) 85%, rgba(3,5,13,0.85) 100%); }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div class="vignette"></div>
+<script type="module">
+import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+const W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x050816, 15, 28);
+const pmrem = new THREE.PMREMGenerator(renderer);
+
+// Dark studio dome with softboxes so glass + plastic pick up crisp edge highlights.
+function studioEnv() {
+  const env = new THREE.Scene();
+  env.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.MeshBasicMaterial({ color: 0x080c1e, side: THREE.BackSide })));
+  const box = (w, h, color, k, x, y, z) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(k), side: THREE.DoubleSide }));
+    m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m);
+  };
+  box(30, 10, 0xdfe6ff, 1.6, 0, 30, 10);
+  box(6, 28, 0x3f63ff, 3.4, -32, 6, -6);
+  box(6, 28, 0x7a5cff, 2.8, 32, 6, -6);
+  box(40, 10, 0x8fa8ff, 0.9, 0, 8, 38);
+  return pmrem.fromScene(env, 0.02).texture;
+}
+scene.environment = studioEnv();
+
+const camera = new THREE.PerspectiveCamera(30, W / H, 0.1, 200);
+camera.position.set(0, 3.0, 11.6);
+camera.lookAt(0, 2.45, 0);
+
+/* ---------- background ---------- */
+function bgTexture() {
+  const c = document.createElement("canvas"); c.width = 1024; c.height = 640;
+  const g = c.getContext("2d");
+  g.fillStyle = "#03050d"; g.fillRect(0, 0, 1024, 640);
+  let r = g.createRadialGradient(512, 300, 10, 512, 300, 460);
+  r.addColorStop(0, "rgba(40,80,200,0.55)"); r.addColorStop(0.5, "rgba(22,36,110,0.3)"); r.addColorStop(1, "rgba(3,5,13,0)");
+  g.fillStyle = r; g.fillRect(0, 0, 1024, 640);
+  r = g.createRadialGradient(860, 120, 10, 860, 120, 320);
+  r.addColorStop(0, "rgba(110,80,220,0.25)"); r.addColorStop(1, "rgba(3,5,13,0)");
+  g.fillStyle = r; g.fillRect(0, 0, 1024, 640);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const bg = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), new THREE.MeshBasicMaterial({ map: bgTexture(), toneMapped: false, fog: false }));
+bg.position.set(0, 6, -14); scene.add(bg);
+
+
+// Floor alpha fade: opaque around the props, transparent toward the back so the floor melts
+// into the background gradient instead of leaving a hard horizon line.
+function floorFade() {
+  const c = document.createElement("canvas"); c.width = 16; c.height = 512;
+  const g = c.getContext("2d");
+  const gr = g.createLinearGradient(0, 150, 0, 236);
+  gr.addColorStop(0, "#000"); gr.addColorStop(1, "#fff");
+  g.fillStyle = gr; g.fillRect(0, 0, 16, 512);
+  return new THREE.CanvasTexture(c);
+}
+const desk = new THREE.Mesh(new THREE.PlaneGeometry(80, 60), new THREE.MeshStandardMaterial({ color: 0x060a1a, roughness: 0.9, envMapIntensity: 0.05, alphaMap: floorFade(), transparent: true, depthWrite: false }));
+desk.rotation.x = -Math.PI / 2; desk.receiveShadow = true; scene.add(desk);
+
+/* ---------- canvas helpers ---------- */
+const FONT = "Inter, Segoe UI, sans-serif";
+function rr(g, x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
+function screenCanvas(w, h, radius, draw) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d");
+  rr(g, 0, 0, w, h, radius); g.save(); g.clip();
+  draw(g, w, h);
+  g.restore();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+// Decorative QR-style pattern (seeded, not an encoded/scannable ticket).
+function qr(g, x, y, size, fg, bg, seed = 7) {
+  const n = 25, m = size / n;
+  let s = seed; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  g.fillStyle = bg; g.fillRect(x, y, size, size);
+  g.fillStyle = fg;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const inFinder = (i < 8 && j < 8) || (i > n - 9 && j < 8) || (i < 8 && j > n - 9);
+    if (!inFinder && rnd() > 0.52) g.fillRect(x + i * m, y + j * m, m + 0.5, m + 0.5);
+  }
+  [[0, 0], [n - 7, 0], [0, n - 7]].forEach(([i, j]) => {
+    g.fillRect(x + i * m, y + j * m, 7 * m, 7 * m);
+    g.fillStyle = bg; g.fillRect(x + (i + 1) * m, y + (j + 1) * m, 5 * m, 5 * m);
+    g.fillStyle = fg; g.fillRect(x + (i + 2) * m, y + (j + 2) * m, 3 * m, 3 * m);
+  });
+}
+function statusBar(g, w, color) {
+  g.fillStyle = color; g.font = `600 30px ${FONT}`; g.fillText("9:41", 48, 58);
+  rr(g, w - 120, 36, 64, 28, 8); g.fillRect(w - 112, 42, 44, 16);
+}
+
+/* left phone: QR e-ticket on a light screen */
+const ticketTex = screenCanvas(720, 1520, 90, (g, w, h) => {
+  const grad = g.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "#eef3ff"); grad.addColorStop(1, "#dfe7ff");
+  g.fillStyle = grad; g.fillRect(0, 0, w, h);
+  statusBar(g, w, "#1b2550");
+  g.fillStyle = "#4b5bd7"; g.font = `600 30px ${FONT}`; g.fillText("E-TICKET", 60, 170);
+  g.fillStyle = "#0f1638"; g.font = `700 54px ${FONT}`; g.fillText("Temple entry", 60, 240);
+  g.fillStyle = "#5a668f"; g.font = `400 32px ${FONT}`; g.fillText("Adult × 2 · Today", 60, 292);
+  g.fillStyle = "#ffffff"; rr(g, 60, 350, w - 120, w - 120, 36); g.fill();
+  qr(g, 100, 390, w - 200, "#101a45", "#ffffff", 11);
+  g.fillStyle = "#5a668f"; g.font = `500 30px ${FONT}`; g.fillText("Show this code at the gate", 60, 1010);
+  g.strokeStyle = "#c3cdf0"; g.setLineDash([12, 12]); g.lineWidth = 3; g.beginPath(); g.moveTo(60, 1070); g.lineTo(w - 60, 1070); g.stroke(); g.setLineDash([]);
+  [["Ticket", "TK-0412"], ["Gate", "Main"], ["Total", "RM 0.00"]].forEach(([k, v], i) => {
+    g.fillStyle = "#7a86ad"; g.font = `400 28px ${FONT}`; g.fillText(k, 60, 1140 + i * 70);
+    g.fillStyle = "#0f1638"; g.font = `600 30px ${FONT}`; g.textAlign = "right"; g.fillText(v, w - 60, 1140 + i * 70); g.textAlign = "left";
+  });
+  g.fillStyle = "#5865f2"; rr(g, 60, 1360, w - 120, 96, 48); g.fill();
+  g.fillStyle = "#fff"; g.font = `600 34px ${FONT}`; g.textAlign = "center"; g.fillText("Add to wallet", w / 2, 1420); g.textAlign = "left";
+});
+
+/* middle device: scanner viewfinder */
+const scanTex = screenCanvas(720, 1300, 40, (g, w, h) => {
+  g.fillStyle = "#050918"; g.fillRect(0, 0, w, h);
+  // blurred "camera feed"
+  const feed = g.createRadialGradient(w / 2, 560, 40, w / 2, 560, 520);
+  feed.addColorStop(0, "#1c3a8f"); feed.addColorStop(0.6, "#0c1846"); feed.addColorStop(1, "#050918");
+  g.fillStyle = feed; g.fillRect(0, 100, w, 940);
+  g.fillStyle = "#c8d6ff"; g.font = `600 34px ${FONT}`; g.fillText("Gate scanner", 48, 72);
+  g.fillStyle = "#3dd68c"; g.beginPath(); g.arc(w - 64, 60, 12, 0, 7); g.fill();
+  // QR under the camera, slightly tilted like a held phone
+  g.save(); g.translate(w / 2, 560); g.rotate(-0.06);
+  g.fillStyle = "rgba(230,238,255,0.92)"; rr(g, -190, -190, 380, 380, 18); g.fill();
+  qr(g, -165, -165, 330, "#0e1a52", "#e6eeff", 23);
+  g.restore();
+  // scan frame corners
+  g.strokeStyle = "#3e8bff"; g.lineWidth = 12; g.lineCap = "round";
+  const f = 250, cx = w / 2, cy = 560, L = 70;
+  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sy]) => {
+    g.beginPath(); g.moveTo(cx + sx * f, cy + sy * (f - L)); g.lineTo(cx + sx * f, cy + sy * f); g.lineTo(cx + sx * (f - L), cy + sy * f); g.stroke();
+  });
+  // scan line
+  const sl = g.createLinearGradient(0, 600, 0, 640);
+  sl.addColorStop(0, "rgba(80,150,255,0)"); sl.addColorStop(0.5, "rgba(120,180,255,0.95)"); sl.addColorStop(1, "rgba(80,150,255,0)");
+  g.fillStyle = sl; g.fillRect(cx - f + 10, 600, 2 * f - 20, 40);
+  // result card
+  g.fillStyle = "#0d1533"; rr(g, 40, 1060, w - 80, 200, 28); g.fill();
+  g.fillStyle = "rgba(61,214,140,0.16)"; g.beginPath(); g.arc(120, 1160, 46, 0, 7); g.fill();
+  g.strokeStyle = "#3dd68c"; g.lineWidth = 8; g.beginPath(); g.moveTo(98, 1160); g.lineTo(114, 1178); g.lineTo(144, 1142); g.stroke();
+  g.fillStyle = "#eaf0ff"; g.font = `700 38px ${FONT}`; g.fillText("Valid ticket", 190, 1148);
+  g.fillStyle = "#7f8bb3"; g.font = `400 28px ${FONT}`; g.fillText("Entry recorded · Gate A", 190, 1196);
+});
+
+/* right phone: counter / POS dashboard */
+const posTex = screenCanvas(720, 1520, 90, (g, w, h) => {
+  g.fillStyle = "#070c1f"; g.fillRect(0, 0, w, h);
+  const hdr = g.createLinearGradient(0, 0, w, 420);
+  hdr.addColorStop(0, "#2f5bff"); hdr.addColorStop(1, "#7a4dff");
+  g.fillStyle = hdr; g.fillRect(0, 0, w, 430);
+  statusBar(g, w, "#ffffff");
+  g.fillStyle = "rgba(255,255,255,0.8)"; g.font = `500 30px ${FONT}`; g.fillText("Counter sales · today", 56, 170);
+  g.fillStyle = "#fff"; g.font = `700 76px ${FONT}`; g.fillText("RM 8,460", 56, 262);
+  g.fillStyle = "rgba(255,255,255,0.75)"; g.font = `400 28px ${FONT}`; g.fillText("312 tickets · 4 partners", 56, 314);
+  // mini bar chart
+  [0.4, 0.55, 0.35, 0.7, 0.6, 0.85, 0.75].forEach((v, i) => {
+    g.fillStyle = i === 5 ? "#ffffff" : "rgba(255,255,255,0.35)";
+    rr(g, 400 + i * 40, 380 - v * 160, 24, v * 160, 8); g.fill();
+  });
+  const items = [["Adult", "RM 20", 4, "#4f8bff"], ["Child", "RM 10", 2, "#8b7bff"], ["Senior", "RM 12", 1, "#3fc3ff"], ["Parking", "RM 5", 1, "#c08bff"]];
+  items.forEach(([n, p, q, col], i) => {
+    const y = 480 + i * 150;
+    g.fillStyle = "#0e1633"; rr(g, 40, y, w - 80, 128, 26); g.fill();
+    g.fillStyle = col; rr(g, 70, y + 30, 68, 68, 18); g.fill();
+    g.fillStyle = "#eaf0ff"; g.font = `600 34px ${FONT}`; g.fillText(n, 164, y + 58);
+    g.fillStyle = "#7f8bb3"; g.font = `400 28px ${FONT}`; g.fillText(p, 164, y + 100);
+    g.fillStyle = "#18224a"; rr(g, w - 250, y + 34, 180, 60, 30); g.fill();
+    g.fillStyle = "#cfd8ff"; g.font = `600 32px ${FONT}`; g.textAlign = "center";
+    g.fillText("−", w - 215, y + 75); g.fillText(String(q), w - 160, y + 75); g.fillText("+", w - 105, y + 75); g.textAlign = "left";
+  });
+  g.fillStyle = "#0e1633"; rr(g, 40, 1100, w - 80, 170, 26); g.fill();
+  g.fillStyle = "#7f8bb3"; g.font = `400 28px ${FONT}`; g.fillText("Subtotal", 70, 1158); g.fillText("Partner commission", 70, 1220);
+  g.fillStyle = "#eaf0ff"; g.font = `600 30px ${FONT}`; g.textAlign = "right"; g.fillText("RM 125.00", w - 70, 1158); g.fillText("RM 6.25", w - 70, 1220); g.textAlign = "left";
+  const btn = g.createLinearGradient(40, 0, w - 40, 0); btn.addColorStop(0, "#4f6bff"); btn.addColorStop(1, "#8a5cff");
+  g.fillStyle = btn; rr(g, 40, 1310, w - 80, 110, 55); g.fill();
+  g.fillStyle = "#fff"; g.font = `700 36px ${FONT}`; g.textAlign = "center"; g.fillText("Print tickets", w / 2, 1378); g.textAlign = "left";
+});
+
+/* receipt paper texture (58mm thermal slip) */
+function receiptTex() {
+  const c = document.createElement("canvas"); c.width = 360; c.height = 520;
+  const g = c.getContext("2d");
+  g.fillStyle = "#f4f6fb"; g.fillRect(0, 0, 360, 520);
+  g.fillStyle = "#2a3150"; g.font = `700 26px ${FONT}`; g.textAlign = "center"; g.fillText("ENTRY TICKET", 180, 300);
+  g.font = `400 18px ${FONT}`; g.fillText("Adult × 2", 180, 330);
+  qr(g, 110, 350, 140, "#1d2340", "#f4f6fb", 5);
+  g.fillStyle = "#9aa1b8"; for (let i = 0; i < 6; i++) g.fillRect(40, 60 + i * 34, 120 + ((i * 53) % 140), 10);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+/* ---------- devices ---------- */
+const bodyMat = new THREE.MeshPhysicalMaterial({ color: 0x0b0f1c, roughness: 0.32, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.2 });
+const bezelMat = new THREE.MeshPhysicalMaterial({ color: 0x020308, roughness: 0.15, metalness: 0.0, clearcoat: 1 });
+
+function phone(tex, w = 1.5, h = 3.1) {
+  const grp = new THREE.Group();
+  const body = new THREE.Mesh(new RoundedBoxGeometry(w, h, 0.16, 8, 0.2), bodyMat); body.castShadow = true; grp.add(body);
+  const front = new THREE.Mesh(new RoundedBoxGeometry(w - 0.04, h - 0.04, 0.02, 8, 0.009), bezelMat); front.position.z = 0.075; grp.add(front);
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.12, (w - 0.12) * (1520 / 720)), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }));
+  scr.position.z = 0.087; grp.add(scr);
+  // glass sheen: a faint diagonal highlight across the screen
+  const sheen = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.12, h - 0.12), new THREE.MeshBasicMaterial({ map: sheenTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  sheen.position.z = 0.089; grp.add(sheen);
+  return grp;
+}
+const sheenTex = (() => {
+  const c = document.createElement("canvas"); c.width = 256; c.height = 512; const g = c.getContext("2d");
+  const gr = g.createLinearGradient(0, 0, 256, 512);
+  gr.addColorStop(0, "rgba(255,255,255,0.10)"); gr.addColorStop(0.35, "rgba(255,255,255,0.03)"); gr.addColorStop(0.36, "rgba(255,255,255,0)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 512);
+  return new THREE.CanvasTexture(c);
+})();
+
+// handheld POS: thicker body, printer housing on top, receipt slip feeding out
+function posTerminal() {
+  const grp = new THREE.Group();
+  const w = 1.78, h = 3.55;
+  const body = new THREE.Mesh(new RoundedBoxGeometry(w, h, 0.3, 8, 0.2), bodyMat); body.castShadow = true; grp.add(body);
+  const printer = new THREE.Mesh(new RoundedBoxGeometry(w, 0.9, 0.62, 8, 0.2), bodyMat); printer.position.set(0, h / 2 - 0.45, -0.14); grp.add(printer);
+  const front = new THREE.Mesh(new RoundedBoxGeometry(w - 0.1, 2.9, 0.02, 6, 0.009), bezelMat); front.position.set(0, -0.25, 0.155); grp.add(front);
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(1.58, 1.58 * (1300 / 720)), new THREE.MeshBasicMaterial({ map: scanTex, transparent: true, toneMapped: false }));
+  scr.position.set(0, -0.2, 0.167); grp.add(scr);
+  const sheen = new THREE.Mesh(new THREE.PlaneGeometry(1.58, 2.8), new THREE.MeshBasicMaterial({ map: sheenTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  sheen.position.set(0, -0.2, 0.169); grp.add(sheen);
+  // paper slot on top of the printer housing + front speaker slit and camera dot
+  const slot = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.02, 0.06), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+  slot.position.set(0, h / 2 + 0.005, -0.2); grp.add(slot);
+  const slit = new THREE.Mesh(new RoundedBoxGeometry(0.42, 0.05, 0.01, 2, 0.02), new THREE.MeshStandardMaterial({ color: 0x1b2340, roughness: 0.5 }));
+  slit.position.set(0, h / 2 - 0.36, 0.175); grp.add(slit);
+  const cam = new THREE.Mesh(new THREE.CircleGeometry(0.045, 24), new THREE.MeshPhysicalMaterial({ color: 0x0a1030, roughness: 0.1, clearcoat: 1 }));
+  cam.position.set(0.5, h / 2 - 0.36, 0.176); grp.add(cam);
+  // accent light strip under the printer (blue status LED)
+  const led = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.01), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 1.2, 3.0), toneMapped: false }));
+  led.position.set(0, h / 2 - 0.95, 0.16); grp.add(led);
+  // receipt: a plane bent backwards as it leaves the printer slot
+  const pg = new THREE.PlaneGeometry(0.86, 1.2, 1, 24);
+  const p = pg.attributes.position;
+  for (let i = 0; i < p.count; i++) { const t = (p.getY(i) + 0.6) / 1.2; p.setZ(i, -Math.pow(t, 2) * 0.7); }
+  pg.computeVertexNormals();
+  const paper = new THREE.Mesh(pg, new THREE.MeshStandardMaterial({ map: receiptTex(), roughness: 0.7, side: THREE.DoubleSide }));
+  paper.position.set(0, h / 2 + 0.5, -0.2); paper.castShadow = true; grp.add(paper);
+  return grp;
+}
+
+const left = phone(ticketTex);
+// the light ticket screen would bloom into a white blob; keep it just under the bloom threshold
+left.children[2].material.color.setScalar(0.8); left.position.set(-2.55, 1.62, 0.3); left.rotation.set(-0.05, 0.32, 0.04); scene.add(left);
+const mid = posTerminal(); mid.position.set(0.05, 1.86, 0.9); mid.rotation.set(-0.04, -0.04, 0); scene.add(mid);
+const right = phone(posTex); right.position.set(2.65, 1.62, 0.3); right.rotation.set(-0.05, -0.36, -0.06); scene.add(right);
+
+// low display plinth behind the devices, with a thin blue edge light
+const plinth = new THREE.Mesh(new RoundedBoxGeometry(9.5, 0.28, 3.4, 4, 0.06), new THREE.MeshPhysicalMaterial({ color: 0x070b18, roughness: 0.35, metalness: 0.3, clearcoat: 0.6 }));
+plinth.position.set(0, 0.0, 0.2); plinth.receiveShadow = true; scene.add(plinth);
+const edge = new THREE.Mesh(new THREE.BoxGeometry(9.3, 0.02, 0.02), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 0.8, 2.6), toneMapped: false }));
+edge.position.set(0, 0.13, 1.91); scene.add(edge);
+// devices stand on the plinth
+[left, mid, right].forEach(o => (o.position.y += 0.14));
+
+/* ---------- lighting ---------- */
+scene.add(new THREE.AmbientLight(0x1a2350, 0.5));
+const key = new THREE.SpotLight(0xcfd9ff, 70, 30, 0.5, 0.7, 1.5);
+key.position.set(4, 9, 8); key.target.position.set(0, 1.5, 0.5); key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004;
+scene.add(key, key.target);
+const rimL = new THREE.SpotLight(0x3b6bff, 240, 30, 0.6, 0.7, 1.4); rimL.position.set(-6, 5, -6); rimL.target.position.set(-1, 2, 0.5); scene.add(rimL, rimL.target);
+const rimR = new THREE.SpotLight(0x8a5cff, 200, 30, 0.6, 0.7, 1.4); rimR.position.set(6, 5, -6); rimR.target.position.set(1, 2, 0.5); scene.add(rimR, rimR.target);
+const glow = new THREE.PointLight(0x4a78ff, 10, 8, 1.6); glow.position.set(0, 2.2, 2.4); scene.add(glow);
+
+/* ---------- post ---------- */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), 0.45, 0.55, 0.88));
+composer.addPass(new OutputPass());
+
+window.__lab = { THREE, scene, camera, left, mid, right, render: () => composer.render() };
+let frames = 0;
+(function tick() {
+  composer.render();
+  if (++frames < 4) requestAnimationFrame(tick); else document.body.dataset.ready = "1";
+})();
+</script>
+</body>
+</html>

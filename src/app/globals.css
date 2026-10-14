@@ -1,26 +1,336 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ── Design tokens — taken from the "Neon Full-Stack Developer Portfolio" reference ──
+   Deep navy/black night, electric blue + violet light, glass cards with soft
+   indigo edges. Legacy token names (void, frost, signal, …) are kept and remapped
+   to the new palette so existing components inherit the new look. */
+@theme {
+  /* Surfaces */
+  --color-night: #03050d;
+  --color-navy: #060a18;
+  --color-deep: #0a1024;
+  --color-card: #0b1228;
+  --color-edge: #1b2747;
+  --color-edge-strong: #2b3a66;
+
+  /* Text */
+  --color-ink: #eef1ff;
+  --color-soft: #c3cbe6;
+  --color-muted: #8d98bb;
+  --color-dim: #7a86ac;
+
+  /* Light */
+  --color-blue: #3b82f6;
+  --color-sky: #60a5fa;
+  --color-cyan: #38bdf8;
+  --color-indigo: #6366f1;
+  --color-violet: #8b5cf6;
+  --color-lilac: #a78bfa;
+  --color-mint: #34d399;
+  --color-gold: #f2c66d;
+  --color-alert: #fb7185;
+
+  /* Legacy aliases (case-study demos, older components) */
+  --color-void: #03050d;
+  --color-graphite: #0a1024;
+  --color-panel: #0d1530;
+  --color-line: #1b2747;
+  --color-line-strong: #2b3a66;
+  --color-steel: #8d98bb;
+  --color-mist: #c3cbe6;
+  --color-frost: #eef1ff;
+  --color-signal: #60a5fa;
+  --color-ice: #93c5fd;
+  --color-iris: #8b5cf6;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sora), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", monospace;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-seam: cubic-bezier(0.86, 0, 0.07, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Page column used by every section (matches the reference's left text edge). */
+@utility shell {
+  width: 100%;
+  max-width: 1320px;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4.5vw, 4rem);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Section kicker: "02./ ABOUT ME" */
+@utility kicker {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-soft);
+}
+
+/* Headline gradients from the hero ("MOVE BUSINESS" violet→blue, "FORWARD." blue→sky). */
+@utility text-gradient-violet {
+  background-image: linear-gradient(90deg, #b38bff 0%, #8b7cff 45%, #6aa8ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@utility text-gradient-blue {
+  background-image: linear-gradient(90deg, #5aa2ff 0%, #4fc3ff 60%, #8b7cff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Glass card: dark translucent navy, hairline indigo edge, faint inner light. */
+@utility glass {
+  background: linear-gradient(180deg, rgba(16, 24, 52, 0.62) 0%, rgba(8, 13, 30, 0.72) 100%);
+  border: 1px solid rgba(88, 110, 190, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(160, 180, 255, 0.06),
+    0 20px 60px -30px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+}
+@utility glass-hover {
+  transition:
+    border-color 0.4s var(--ease-out-expo),
+    box-shadow 0.4s var(--ease-out-expo),
+    transform 0.5s var(--ease-out-expo);
+  &:hover {
+    border-color: rgba(120, 140, 255, 0.55);
+    box-shadow:
+      inset 0 1px 0 rgba(160, 180, 255, 0.1),
+      0 0 0 1px rgba(99, 102, 241, 0.15),
+      0 24px 70px -28px rgba(79, 70, 229, 0.55);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Buttons from the reference: filled indigo→violet, and a hairline outline. */
+@utility btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border-radius: 0.6rem;
+  padding: 0.95rem 1.6rem;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background-image: linear-gradient(90deg, #4f5bff 0%, #6d5cff 55%, #8b5cf6 100%);
+  box-shadow:
+    0 10px 30px -10px rgba(99, 102, 241, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition:
+    box-shadow 0.4s var(--ease-out-expo),
+    filter 0.3s;
+  &:hover {
+    filter: brightness(1.12);
+    box-shadow:
+      0 14px 40px -10px rgba(124, 92, 255, 0.95),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+}
+@utility btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border-radius: 0.6rem;
+  padding: 0.95rem 1.6rem;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink);
+  border: 1px solid rgba(150, 165, 220, 0.45);
+  background: rgba(6, 10, 24, 0.35);
+  transition:
+    border-color 0.3s,
+    background-color 0.3s;
+  &:hover {
+    border-color: rgba(190, 200, 255, 0.85);
+    background: rgba(40, 50, 110, 0.25);
+  }
+}
+
+/* Small tech pill used on project cards. */
+@utility pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--color-soft);
+  background: rgba(30, 40, 80, 0.55);
+  border: 1px solid rgba(99, 110, 180, 0.3);
+}
+
+@layer base {
+  html {
+    background: var(--color-night);
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html:not(.lenis) {
+      scroll-behavior: smooth;
+    }
+  }
+
+  body {
+    background: var(--color-night);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
+    overflow-x: clip;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
+
+  ::selection {
+    background: var(--color-indigo);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-sky);
+    outline-offset: 3px;
+  }
+
+  section[id] {
+    scroll-margin-top: 4.5rem;
+  }
+
+  button {
+    cursor: pointer;
+  }
+}
+
+/* Lenis (smooth wheel scroll) base styles */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+.lenis [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Night-sky backdrop shared by sections: navy wash + faint stars. */
+.night-sky {
+  background:
+    radial-gradient(1200px 600px at 75% -10%, rgba(59, 90, 220, 0.22), transparent 60%),
+    radial-gradient(900px 500px at 10% 110%, rgba(99, 60, 220, 0.12), transparent 60%),
+    var(--color-night);
+}
+.stars {
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(1px 1px at 32% 72%, rgba(255, 255, 255, 0.45), transparent 60%),
+    radial-gradient(1.5px 1.5px at 58% 28%, rgba(170, 190, 255, 0.8), transparent 60%),
+    radial-gradient(1px 1px at 78% 62%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(1px 1px at 88% 14%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(1px 1px at 44% 44%, rgba(200, 210, 255, 0.4), transparent 60%),
+    radial-gradient(1px 1px at 6% 86%, rgba(255, 255, 255, 0.4), transparent 60%);
+  background-size: 600px 600px;
+}
+
+/* Hairline blueprint grid (case-study diagrams). */
+.blueprint {
+  background-image:
+    linear-gradient(to right, rgba(60, 80, 140, 0.18) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(60, 80, 140, 0.18) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@keyframes scan {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(var(--scan-distance, 120px));
+  }
+}
+@keyframes scroll-wheel {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+}
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Preloader / page-intro: hidden immediately on repeat visits / reduced motion,
+   and force-removed by CSS after 3.2s in case JavaScript never runs. */
+html[data-intro="skip"] .page-intro {
+  display: none;
+}
+@keyframes intro-failsafe {
+  to {
+    visibility: hidden;
+    opacity: 0;
+  }
+}
+.page-intro {
+  animation: intro-failsafe 0.01s linear 3.2s forwards;
+}
+
+/* ── Legacy utilities (kept so older components compile; remapped to the new type system) ── */
+@utility display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+@utility font-wide {
+  font-family: var(--font-display);
+}
+@utility font-semiwide {
+  font-family: var(--font-display);
+}
+@utility gutter {
+  padding-inline: clamp(1.25rem, 4.5vw, 4rem);
+}
+.outline-type {
+  color: transparent;
+  -webkit-text-stroke: 1px var(--color-edge-strong);
 }
