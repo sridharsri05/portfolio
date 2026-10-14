@@ -78,7 +78,7 @@
   color: transparent;
 }
 @utility text-gradient-blue {
-  background-image: linear-gradient(90deg, #5aa2ff 0%, #4fc3ff 60%, #8b7cff 100%);
+  background-image: linear-gradient(90deg, #5aa2ff 0%, #4f8bff 40%, #8b5cf6 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

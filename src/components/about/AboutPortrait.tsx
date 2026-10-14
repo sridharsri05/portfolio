@@ -34,7 +34,7 @@ const PHOTO_MASK: CSSProperties = {
 };
 const PORTRAIT_MASK: CSSProperties = { maskImage: PORTRAIT_FADE, WebkitMaskImage: PORTRAIT_FADE };
 // Cutout: only the bottom fades, so the figure settles into the rocky ground of the backdrop.
-const CUTOUT_FADE = "linear-gradient(to bottom, #000 78%, transparent 100%)";
+const CUTOUT_FADE = "linear-gradient(to bottom, #000 88%, transparent 100%)";
 const CUTOUT_MASK: CSSProperties = { maskImage: CUTOUT_FADE, WebkitMaskImage: CUTOUT_FADE };
 
 export function AboutPortrait() {
@@ -51,7 +51,8 @@ export function AboutPortrait() {
         <div aria-hidden className="absolute inset-0 lg:-right-[6%]">
           <CrystalCanvas preset="about" />
         </div>
-        <div className="absolute inset-x-0 bottom-0 top-0 lg:-right-[6%]" style={CUTOUT_MASK}>
+        {/* On desktop the figure is inset from the left and top so the glowing panels show around the head and shoulder. */}
+        <div className="absolute inset-x-0 bottom-0 top-0 lg:-right-[6%] lg:left-[14%] lg:top-[7%]" style={CUTOUT_MASK}>
           <Image
             src={profile.portrait}
             alt={`Portrait of ${profile.name}`}
